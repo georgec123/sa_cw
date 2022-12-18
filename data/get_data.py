@@ -1,4 +1,3 @@
-import yfinance as yf
 import os
 from cryptocmd import CmcScraper
 
