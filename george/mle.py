@@ -30,6 +30,20 @@ class Distribution(ABC):
         pass
 
 
+    def __repr__(self) -> str:
+        if self.sol is None:
+            repr_str = f"{self.name} - Unfit"
+        else:
+            repr_str = f"{self.name}("
+
+            param_list = []
+            for p_name, p in zip(self.parameters, self.sol.x):
+                param_list.append(f"{p_name}={p:.3f}")
+            
+            repr_str = f"{repr_str} {', '.join(param_list)})"
+
+        return repr_str
+
     def mle(self, x):
         self.sample_size = x.shape[0]
         
