@@ -29,6 +29,15 @@ class Distribution(ABC):
     def log_likelihood(x):
         pass
 
+    
+    def info_dict(self):
+        info_dict = {'dist':self.name, 
+         'LL':self.sol.fun, 'AIC':self.aic(), 'AICC':self.aicc(), 'BIC':self.bic(), 
+         'CAIC':self.caic(), 'HQC': self.hqc(),
+         'pydist':self
+         }
+        return info_dict
+
 
     def __repr__(self) -> str:
         if self.sol is None:
