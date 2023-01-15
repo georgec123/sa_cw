@@ -262,8 +262,10 @@ class SkewedStudent(Distribution):
     
     
     def skewed_student_t_pdf(self, x,mu,sigma,nu,alpha):
-        indicator=(x>mu)*1 #switch on if x is greater than mu
-        return (self.kappa(nu)/sigma) * (1+(1/nu)*( (x-mu)/(2*sigma*( alpha*(1-indicator) +(1-alpha)*indicator) ) )**2)**(-(nu+1)/2)
+        sign = 2*((x>mu)*1 - 0.5)
+
+        return (self.kappa(nu)/sigma) * (1+(1/nu)*( (x-mu)/(2*sigma*( 1+sign*alpha ) )**2)**(-(nu+1)/2))
+
 
     def log_likelihood(self, mu,sigma,nu,alpha,x):
         return np.sum(np.log(self.skewed_student_t_pdf(x,mu,sigma,nu,alpha)))
@@ -271,7 +273,7 @@ class SkewedStudent(Distribution):
     def mle(self, x):
         objfun= lambda theta: -1*self.log_likelihood(theta[0],theta[1],theta[2],theta[3],x)
         
-        bnds=((-np.inf,np.inf), (0.01,np.inf), (0.01,np.inf), (0.0001,0.9999) ) #bounds on parameters
+        bnds=((-np.inf,np.inf), (0.01,np.inf), (0.01,np.inf), (-0.9999,0.9999) ) #bounds on parameters
 
         init_theta=[np.mean(x),np.std(x,ddof=1),1,0.5]
 
