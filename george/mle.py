@@ -17,6 +17,7 @@ class Distribution(ABC):
         self.name = None
         self.num_parameters  = None
         self.parameters = None
+        self.sample_size = None
         return
 
     
@@ -29,7 +30,8 @@ class Distribution(ABC):
         pass
 
     @abstractmethod
-    def mle(x):
+    def mle(self, x):
+        self.sample_size = x.shape[0]
         pass
 
         
@@ -41,6 +43,42 @@ class Distribution(ABC):
         L-the value of the loglikelihood function
         '''
         return 2*self.num_parameters +2*self.sol.fun
+    
+    def bic(self):
+        '''
+        The BIC of an MLE estiamte equals #parameters * log(sample size) - 2 * value of loglikelihood
+        Inputs:
+        k-number of parameters in distribution
+        L-the value of the loglikelihood function
+        '''        
+        return self.num_parameters*np.log(self.sample_size) + 2*self.sol.fun
+    
+    def caic(self):
+        '''
+        The BIC of an MLE estiamte equals #parameters * (log(sample size)+1) - 2 * value of loglikelihood
+        Inputs:
+        k-number of parameters in distribution
+        L-the value of the loglikelihood function
+        '''     
+        return self.num_parameters*(np.log(self.sample_size)+1) + 2*self.sol.fun
+    
+    def aicc(self):
+        '''
+        corrected Akaike information criterion
+        '''
+        k = self.num_parameters
+        n = self.sample_size
+        
+        return self.aic() + 2*k*(k+1)/(n-k-1)
+    
+    def hqc(self):
+        '''
+        Hannan-Quinn criterion
+        '''
+        k = self.num_parameters
+        n = self.sample_size
+        
+        return 2*self.sol.fun + 2*k*np.log(np.log(n))
 
 
     def kappa(self, nu):
@@ -62,6 +100,7 @@ class Laplace(Distribution):
         return -n*np.log(2*b)-np.sum(np.abs(x-mu)/b)
 
     def mle(self, x):
+        super().mle(x)
         objfun=lambda theta : -1*self.log_likelihood(theta[0],theta[1],x) 
         bnds=((-np.inf,np.inf), (0,np.inf)) #bounds on parameters
 
@@ -91,6 +130,7 @@ class StudentT(Distribution):
         return np.sum(np.log(self.student_t_pdf(x,mu,sigma,nu)))
 
     def mle(self, x):
+        super().mle(x)
         objfun= lambda theta: -1*self.log_likelihood(theta[0],theta[1],theta[2], x)
 
         bnds=((-np.inf,np.inf), (0,np.inf), (0,np.inf) ) 
@@ -120,6 +160,7 @@ class GeneralizedT(Distribution):
 
 
     def mle(self, x):
+        super().mle(x)
         objfun= lambda theta: -1*self.log_likelihood(theta[0],theta[1],theta[2],theta[3],x)
         
         bnds=((-np.inf,np.inf), (0.001,np.inf), (0.001,np.inf), (0.001,np.inf) ) #bounds on parameters
@@ -153,6 +194,7 @@ class NormalizedInverseGaussian(Distribution):
         return np.sum(np.log(stats.norminvgauss.pdf(x,a=alpha*delta,b=beta*delta,loc=mu,scale=delta)))
 
     def mle(self, x):
+        super().mle(x)
         objfun= lambda theta: -1*self.log_likelihood(theta[0],theta[1],theta[2],theta[3],x)
         
         bnds=((-np.inf,np.inf), (0.01,np.inf), (0.01,np.inf), (0.01,np.inf) ) #bounds on parameters
@@ -184,6 +226,7 @@ class GeneralizedHyperbolic(Distribution):
         return np.sum(np.log(stats.genhyperbolic.pdf(x,p=lmda,a=delta*alpha,b=beta*delta,scale=delta,loc=mu)))
 
     def mle(self, x):
+        super().mle(x)
         objfun= lambda theta: -1*self.log_likelihood(theta[0],theta[1],theta[2],theta[3],theta[4],x)
         
         bnds=((-np.inf,np.inf), (0.01,np.inf), (-np.inf,np.inf), (0.01,np.inf), (0.01,np.inf) ) #bounds on parameters
@@ -237,6 +280,7 @@ class SkewT(Distribution):
         return np.sum(np.log(self.skewt_pdf(x,mu,sigma,nu,lmda)))
 
     def mle(self, x):
+        super().mle(x)
         objfun= lambda theta: -1*self.log_likelihood(theta[0],theta[1],theta[2],theta[3],x)
 
         bnds=((-np.inf,np.inf), (0,np.inf), (0,np.inf), (-np.inf,np.inf) ) #bounds on parameters
@@ -269,6 +313,7 @@ class SkewedStudent(Distribution):
         return np.sum(np.log(self.skewed_student_t_pdf(x,mu,sigma,nu,alpha)))
 
     def mle(self, x):
+        super().mle(x)
         objfun= lambda theta: -1*self.log_likelihood(theta[0],theta[1],theta[2],theta[3],x)
         
         bnds=((-np.inf,np.inf), (0.01,np.inf), (0.01,np.inf), (0.0001,0.9999) ) #bounds on parameters
