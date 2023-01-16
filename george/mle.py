@@ -7,6 +7,8 @@ from scipy.optimize import minimize
 import scipy.stats as stats
 from scipy.special import hyp2f1, beta
 from abc import ABC, abstractproperty, abstractmethod
+from collections.abc import Iterable
+
 from scipy.special import beta, hyp2f1
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar
@@ -20,6 +22,7 @@ class Distribution(ABC):
         self.num_parameters = None
         self.parameters = None
         self.sample_size = None
+        self.data = None
         return
 
     @abstractmethod
@@ -51,8 +54,29 @@ class Distribution(ABC):
                      }
         return info_dict
 
+
+    def plot_dist(self):
+        """
+        Plot observed data and fit
+        """
+        _, ax = plt.subplots(1,1)
+        
+        mu = self.data.mean()
+        std = self.data.std()
+
+        linspace = np.linspace(mu-4*std,mu+4*std, 101)
+
+        ax.hist(self.data.values, bins=50, density=True)
+        density = self.pdf(linspace, *self.sol.x)
+
+        ax.plot(linspace, density)
+        ax.set_title(f"{self}")
+
+        return ax
+
     def mle(self, x):
         self.sample_size = x.shape[0]
+        self.data = x 
 
     def __repr__(self) -> str:
         if self.sol is None:
@@ -64,7 +88,7 @@ class Distribution(ABC):
             for p_name, p in zip(self.parameters, self.sol.x):
                 param_list.append(f"{p_name}={p:.3f}")
 
-            repr_str = f"{repr_str} {', '.join(param_list)})"
+            repr_str = f"{repr_str}{', '.join(param_list)})"
 
         return repr_str
 
