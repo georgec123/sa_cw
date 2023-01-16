@@ -138,6 +138,13 @@ class Distribution(ABC):
         n = self.sample_size
 
         return 2*self.sol.fun + 2*k*np.log(np.log(n))
+    
+    def kol_smir(self):
+        '''
+        Kolmogorov-Smirnov test
+        '''
+        cdfdata=list(map(self.cdf,self.data))
+        return stats.kstest(self.data,cdfdata)
 
     def kappa(self, nu):
         return 1/(np.sqrt(nu)*beta(nu/2, 1/2))
