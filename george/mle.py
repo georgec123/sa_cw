@@ -1,11 +1,11 @@
 import pandas as pd
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib.dates as mdates
 import numpy as np
 from scipy.optimize import minimize
 import scipy.stats as stats
-from scipy.special import hyp2f1, beta #gauss hypergeometric functi
+from scipy.special import hyp2f1, beta
 from abc import ABC, abstractproperty, abstractmethod
 from scipy.special import beta, hyp2f1
 from scipy.integrate import quad
@@ -17,12 +17,11 @@ class Distribution(ABC):
 
         self.sol = None
         self.name = None
-        self.num_parameters  = None
+        self.num_parameters = None
         self.parameters = None
         self.sample_size = None
         return
 
-    
     @abstractmethod
     def log_likelihood(x):
         pass
@@ -35,23 +34,21 @@ class Distribution(ABC):
         """
         Integrate the pdf function to return Cumulative Density value
         """
-        return quad(lambda x: self.pdf(x,*self.sol.x),-np.inf,x)[0]
+        return quad(lambda x: self.pdf(x, *self.sol.x), -np.inf, x)[0]
 
     def quantile(self, alpha):
         return minimize_scalar(lambda x: (self.cdf(x)-alpha)**2).x
 
-    
-    
     def print_params(self):
         for idx, param in enumerate(self.parameters):
             print(f"{param}: {self.sol.x[idx]}")
 
     def info_dict(self):
-        info_dict = {'dist':self.name, 
-         'LL':self.sol.fun, 'AIC':self.aic(), 'AICC':self.aicc(), 'BIC':self.bic(), 
-         'CAIC':self.caic(), 'HQC': self.hqc(),
-         'pydist':self
-         }
+        info_dict = {'dist': self.name,
+                     'LL': self.sol.fun, 'AIC': self.aic(), 'AICC': self.aicc(), 'BIC': self.bic(),
+                     'CAIC': self.caic(), 'HQC': self.hqc(),
+                     'pydist': self
+                     }
         return info_dict
 
     def mle(self, x):
@@ -66,13 +63,11 @@ class Distribution(ABC):
             param_list = []
             for p_name, p in zip(self.parameters, self.sol.x):
                 param_list.append(f"{p_name}={p:.3f}")
-            
+
             repr_str = f"{repr_str} {', '.join(param_list)})"
 
         return repr_str
 
-
-                
     def aic(self):
         '''
         The AIC of an MLE estiamte equals 2*number of parameters - value of loglikelihood
@@ -80,47 +75,47 @@ class Distribution(ABC):
         k-number of parameters in distribution
         L-the value of the loglikelihood function
         '''
-        return 2*self.num_parameters +2*self.sol.fun
-    
+        return 2*self.num_parameters + 2*self.sol.fun
+
     def bic(self):
         '''
         The BIC of an MLE estiamte equals #parameters * log(sample size) - 2 * value of loglikelihood
         Inputs:
         k-number of parameters in distribution
         L-the value of the loglikelihood function
-        '''        
+        '''
         return self.num_parameters*np.log(self.sample_size) + 2*self.sol.fun
-    
+
     def caic(self):
         '''
         The BIC of an MLE estiamte equals #parameters * (log(sample size)+1) - 2 * value of loglikelihood
         Inputs:
         k-number of parameters in distribution
         L-the value of the loglikelihood function
-        '''     
+        '''
         return self.num_parameters*(np.log(self.sample_size)+1) + 2*self.sol.fun
-    
+
     def aicc(self):
         '''
         corrected Akaike information criterion
         '''
         k = self.num_parameters
         n = self.sample_size
-        
+
         return self.aic() + 2*k*(k+1)/(n-k-1)
-    
+
     def hqc(self):
         '''
         Hannan-Quinn criterion
         '''
         k = self.num_parameters
         n = self.sample_size
-        
-        return 2*self.sol.fun + 2*k*np.log(np.log(n))
 
+        return 2*self.sol.fun + 2*k*np.log(np.log(n))
 
     def kappa(self, nu):
         return 1/(np.sqrt(nu)*beta(nu/2, 1/2))
+
 
 class Laplace(Distribution):
 
@@ -129,28 +124,27 @@ class Laplace(Distribution):
         self.num_parameters = 2
         self.parameters = ['mu', 'b']
         self.name = 'Laplace'
-        
+
     @staticmethod
     def pdf(x, mu, b):
         return np.exp(-np.abs(x-mu)/b)/(2*b)
-    
 
     def log_likelihood(self, x, mu, b):
         return np.sum(np.log(self.pdf(x, mu, b)))
 
-
     def mle(self, x):
         super().mle(x)
-        objfun=lambda theta : -1*self.log_likelihood(x, *theta) 
-        bnds=((-np.inf,np.inf), (1e-15,np.inf)) #bounds on parameters
+        def objfun(theta): return -1*self.log_likelihood(x, *theta)
+        bnds = ((-np.inf, np.inf), (1e-15, np.inf))  # bounds on parameters
 
-        init_theta=[np.mean(x),1]
+        init_theta = [np.mean(x), 1]
 
-        sol=minimize(objfun,init_theta, method='Nelder-Mead',bounds=bnds)
-        
+        sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
+
         self.sol = sol
         return sol.x
-    
+
+
 class StudentT(Distribution):
     def __init__(self) -> None:
 
@@ -159,26 +153,25 @@ class StudentT(Distribution):
         self.parameters = ['mu', 'sigma', 'nu']
         self.name = 'Student T'
 
-       
     def pdf(self, x, mu, sigma, nu):
-        return (self.kappa(nu)/sigma) * (1+ ((x-mu)**2)/(nu * sigma**2))**(-(1+nu)/2)
+        return (self.kappa(nu)/sigma) * (1 + ((x-mu)**2)/(nu * sigma**2))**(-(1+nu)/2)
 
-    
-    def log_likelihood(self, x, mu, sigma,nu):
+    def log_likelihood(self, x, mu, sigma, nu):
         return np.sum(np.log(self.pdf(x, mu, sigma, nu)))
 
     def mle(self, x):
         super().mle(x)
-        objfun= lambda theta: -1*self.log_likelihood(x, *theta) 
+        def objfun(theta): return -1*self.log_likelihood(x, *theta)
 
-        bnds=((-np.inf,np.inf), (0,np.inf), (0,np.inf) ) 
-        init_theta=[np.mean(x),0.05,1]
+        bnds = ((-np.inf, np.inf), (0, np.inf), (0, np.inf))
+        init_theta = [np.mean(x), 0.05, 1]
 
-        sol=minimize(objfun,init_theta, method='Nelder-Mead',bounds=bnds)
+        sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
 
         self.sol = sol
 
         return sol
+
 
 class GeneralizedT(Distribution):
 
@@ -188,24 +181,24 @@ class GeneralizedT(Distribution):
         self.num_parameters = 4
         self.parameters = ['mu', 'sigma', 'nu', 'tau']
         self.name = 'Generalized T'
-        
+
     @staticmethod
     def pdf(x, mu, sigma, nu, tao):
-        return (tao/ (2*sigma*nu**(1/tao) * beta(nu,1/tao)))*(1+ 1/nu * np.abs((x-mu)/sigma)**tao)**(-(nu+1/tao))
+        return (tao / (2*sigma*nu**(1/tao) * beta(nu, 1/tao)))*(1 + 1/nu * np.abs((x-mu)/sigma)**tao)**(-(nu+1/tao))
 
     def log_likelihood(self, x, mu, sigma, nu, tao):
         return np.sum(np.log(self.pdf(x, mu, sigma, nu, tao)))
 
-
     def mle(self, x):
         super().mle(x)
-        objfun= lambda theta: -1*self.log_likelihood(x, *theta) 
-        
-        bnds=((-np.inf,np.inf), (0.001,np.inf), (0.001,np.inf), (0.001,np.inf) ) #bounds on parameters
+        def objfun(theta): return -1*self.log_likelihood(x, *theta)
 
-        init_theta=[np.mean(x), np.std(x, ddof=1), 1, 1]
+        bnds = ((-np.inf, np.inf), (0.001, np.inf), (0.001, np.inf),
+                (0.001, np.inf))  # bounds on parameters
 
-        sol=minimize(objfun, init_theta, method='SLSQP', bounds=bnds)
+        init_theta = [np.mean(x), np.std(x, ddof=1), 1, 1]
+
+        sol = minimize(objfun, init_theta, method='SLSQP', bounds=bnds)
 
         self.sol = sol
         return sol
@@ -236,21 +229,23 @@ class NormalizedInverseGaussian(Distribution):
 
     def mle(self, x):
         super().mle(x)
-        objfun= lambda theta: -1*self.log_likelihood(x, *theta) 
-        
-        bnds=((-np.inf,np.inf), (0.01,np.inf), (0.01,np.inf), (0.01,np.inf) ) #bounds on parameters
-        
-        constraint= lambda theta : theta[2]-theta[3] #inequality constraint alpha-beta>0 equivalent to alpha>beta
-        
-        con={'type': 'ineq','fun':constraint}
+        def objfun(theta): return -1*self.log_likelihood(x, *theta)
 
-        init_theta=[np.mean(x), np.std(x,ddof=1), 1, 0.5]
+        bnds = ((-np.inf, np.inf), (0.01, np.inf), (0.01, np.inf),
+                (0.01, np.inf))  # bounds on parameters
 
-        sol=minimize(objfun,init_theta, method='SLSQP',bounds=bnds,constraints=con)
+        # inequality constraint alpha-beta>0 equivalent to alpha>beta
+        def constraint(theta): return theta[2]-theta[3]
+
+        con = {'type': 'ineq', 'fun': constraint}
+
+        init_theta = [np.mean(x), np.std(x, ddof=1), 1, 0.5]
+
+        sol = minimize(objfun, init_theta, method='SLSQP',
+                       bounds=bnds, constraints=con)
 
         self.sol = sol
-        return  sol
-
+        return sol
 
 
 class GeneralizedHyperbolic(Distribution):
@@ -259,35 +254,36 @@ class GeneralizedHyperbolic(Distribution):
 
         super().__init__()
         self.num_parameters = 5
-        self.parameters = ['mu', 'delta', 'lambda', 'alpha' ,'beta']
+        self.parameters = ['mu', 'delta', 'lambda', 'alpha', 'beta']
         self.name = 'Generalized Hyperbolic'
 
     @staticmethod
     def pdf(x, mu, delta, lmda, alpha, beta):
         return stats.genhyperbolic.pdf(x, p=lmda, a=delta*alpha, b=beta*delta, scale=delta, loc=mu)
 
-
     def log_likelihood(self, x, mu, delta, lmda, alpha, beta):
         return np.sum(np.log(self.pdf(x, mu, delta, lmda, alpha, beta)))
 
     def mle(self, x):
         super().mle(x)
-        objfun= lambda theta: -1*self.log_likelihood(x, *theta) 
-        
-        bnds=((-np.inf,np.inf), (0.01,np.inf), (-np.inf,np.inf), (0.01,np.inf), (0.01,np.inf) ) #bounds on parameters
-        
-        constraint= lambda theta : theta[3]-theta[4] #inequality constraint alpha-beta>0 equivalent to alpha>beta
-        
-        con={'type': 'ineq','fun':constraint}
+        def objfun(theta): return -1*self.log_likelihood(x, *theta)
 
-        init_theta=[np.mean(x), np.std(x,ddof=1), 1, 1, 0.5]
+        bnds = ((-np.inf, np.inf), (0.01, np.inf), (-np.inf, np.inf),
+                (0.01, np.inf), (0.01, np.inf))  # bounds on parameters
 
-        sol=minimize(objfun,init_theta, method='Nelder-Mead',bounds=bnds,constraints=con)
+        # inequality constraint alpha-beta>0 equivalent to alpha>beta
+        def constraint(theta): return theta[3]-theta[4]
+
+        con = {'type': 'ineq', 'fun': constraint}
+
+        init_theta = [np.mean(x), np.std(x, ddof=1), 1, 1, 0.5]
+
+        sol = minimize(objfun, init_theta, method='Nelder-Mead',
+                       bounds=bnds, constraints=con)
 
         self.sol = sol
 
         return sol
-
 
 
 class SkewT(Distribution):
@@ -298,24 +294,26 @@ class SkewT(Distribution):
         self.num_parameters = 4
         self.parameters = ['mu', 'sigma', 'nu', 'lambda']
         self.name = 'Skew T'
-        
+
     @staticmethod
     def pdf(x, mu, sigma, nu, lmda):
-        return (2/sigma)*stats.t.pdf((x-mu)/sigma,df=nu)*\
-            stats.t.cdf((lmda*(x-mu)/sigma) *np.sqrt( (nu+1)/(((x-mu)/sigma)**2 + nu) ) ,df=nu+1)
+        return (2/sigma)*stats.t.pdf((x-mu)/sigma, df=nu) *\
+            stats.t.cdf((lmda*(x-mu)/sigma) * np.sqrt((nu+1) /
+                        (((x-mu)/sigma)**2 + nu)), df=nu+1)
 
-    def log_likelihood(self, x, mu,sigma,nu, lmda):
+    def log_likelihood(self, x, mu, sigma, nu, lmda):
         return np.sum(np.log(self.pdf(x, mu, sigma, nu, lmda)))
 
     def mle(self, x):
         super().mle(x)
-        objfun= lambda theta: -1*self.log_likelihood(x, *theta) 
+        def objfun(theta): return -1*self.log_likelihood(x, *theta)
 
-        bnds=((-np.inf,np.inf), (1e-15,np.inf), (1e-15,np.inf), (-np.inf,np.inf) ) #bounds on parameters
+        bnds = ((-np.inf, np.inf), (1e-15, np.inf), (1e-15, np.inf),
+                (-np.inf, np.inf))  # bounds on parameters
 
-        init_theta=[np.mean(x), np.std(x,ddof=1), 1, 1]
+        init_theta = [np.mean(x), np.std(x, ddof=1), 1, 1]
 
-        sol=minimize(objfun,init_theta, method='Nelder-Mead',bounds=bnds)
+        sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
 
         self.sol = sol
 
@@ -330,24 +328,24 @@ class SkewedStudent(Distribution):
         self.num_parameters = 4
         self.parameters = ['mu', 'sigma', 'nu', 'alpha']
         self.name = 'Skewed Student T'
-    
-    
+
     def pdf(self, x, mu, sigma, nu, alpha):
-        indicator=(x>mu)*1 #switch on if x is greater than mu
-        return (self.kappa(nu)/sigma) * (1+(1/nu)*( (x-mu)/(2*sigma*( alpha*(1-indicator) +(1-alpha)*indicator) ) )**2)**(-(nu+1)/2)
+        indicator = (x > mu)*1  # switch on if x is greater than mu
+        return (self.kappa(nu)/sigma) * (1+(1/nu)*((x-mu)/(2*sigma*(alpha*(1-indicator) + (1-alpha)*indicator)))**2)**(-(nu+1)/2)
 
     def log_likelihood(self, x, mu, sigma, nu, alpha):
         return np.sum(np.log(self.pdf(x, mu, sigma, nu, alpha)))
 
     def mle(self, x):
         super().mle(x)
-        objfun= lambda theta: -1*self.log_likelihood(x, *theta) 
+        def objfun(theta): return -1*self.log_likelihood(x, *theta)
 
-        bnds=((-np.inf,np.inf), (1e-15,np.inf), (1e-15,np.inf), (-np.inf,np.inf) ) #bounds on parameters
+        bnds = ((-np.inf, np.inf), (1e-15, np.inf), (1e-15, np.inf),
+                (-np.inf, np.inf))  # bounds on parameters
 
-        init_theta=[np.mean(x), np.std(x,ddof=1), 1, 0.5]
+        init_theta = [np.mean(x), np.std(x, ddof=1), 1, 0.5]
 
-        sol=minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
+        sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
 
         self.sol = sol
         return sol
@@ -361,34 +359,31 @@ class AsymmetricStudentT(Distribution):
         self.num_parameters = 5
         self.parameters = ['mu', 'sigma', 'nu1', 'nu2', 'alpha']
         self.name = 'Asymmetric Student T'
-    
-    def pdf(self, x, mu, sigma, nu1, nu2, alpha):
-        indicator=(x>mu)*1 #switch on if x is greater than mu
-        
-        alpha2=alpha*self.kappa(nu1)/(alpha*self.kappa(nu1)+(1-alpha)*self.kappa(nu2))
-        
-        nu_indicator=nu1*(1-indicator) + nu2*indicator
-        
-        return ((alpha/alpha2*(1-indicator) + (1-alpha)/(1-alpha2)*indicator) *
-                self.kappa(nu_indicator)/sigma*(1+1/nu_indicator*( (x-mu)/(2*sigma*( alpha2*(1-indicator) +(1-alpha2)*indicator) ) )**2)**(-(nu_indicator+1)/2))
 
+    def pdf(self, x, mu, sigma, nu1, nu2, alpha):
+        indicator = (x > mu)*1  # switch on if x is greater than mu
+
+        alpha2 = alpha*self.kappa(nu1)/(alpha *
+                                        self.kappa(nu1)+(1-alpha)*self.kappa(nu2))
+
+        nu_indicator = nu1*(1-indicator) + nu2*indicator
+
+        return ((alpha/alpha2*(1-indicator) + (1-alpha)/(1-alpha2)*indicator) *
+                self.kappa(nu_indicator)/sigma*(1+1/nu_indicator*((x-mu)/(2*sigma*(alpha2*(1-indicator) + (1-alpha2)*indicator)))**2)**(-(nu_indicator+1)/2))
 
     def log_likelihood(self, x, mu, sigma, nu1, nu2, alpha):
         return np.sum(np.log(self.pdf(x, mu, sigma, nu1, nu2, alpha)))
 
-
-
     def mle(self, x):
         super().mle(x)
-        objfun= lambda theta: -1*self.log_likelihood(x, *theta) 
-        
-        bnds=((-np.inf,np.inf), (0.001,np.inf), (0.001,np.inf), (0.001,np.inf), (0.01,0.99) ) #bounds on parameters
+        def objfun(theta): return -1*self.log_likelihood(x, *theta)
 
+        bnds = ((-np.inf, np.inf), (0.001, np.inf), (0.001, np.inf),
+                (0.001, np.inf), (0.01, 0.99))  # bounds on parameters
 
-        init_theta=[np.mean(x), np.std(x, ddof=1), 1, 1, 0.5]
+        init_theta = [np.mean(x), np.std(x, ddof=1), 1, 1, 0.5]
 
-        sol=minimize(objfun,init_theta, method='SLSQP',bounds=bnds)
+        sol = minimize(objfun, init_theta, method='SLSQP', bounds=bnds)
 
         self.sol = sol
         return sol
-    
