@@ -1,13 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-import matplotlib.dates as mdates
 import numpy as np
 from scipy.optimize import minimize
 import scipy.stats as stats
 from scipy.special import hyp2f1, beta
-from abc import ABC, abstractproperty, abstractmethod
-from collections.abc import Iterable
+from abc import ABC, abstractmethod
 
 from scipy.special import beta, hyp2f1
 from scipy.integrate import quad
@@ -18,11 +15,11 @@ class Distribution(ABC):
     def __init__(self) -> None:
 
         self.sol = None
-        self.name = None
-        self.num_parameters = None
-        self.parameters = None
-        self.sample_size = None
-        self.data = None
+        self.name : str = None
+        self.num_parameters : int = None
+        self.parameters : str = None
+        self.sample_size : int = None
+        self.data : pd.DataFrame = None
         return
 
     @abstractmethod
@@ -37,7 +34,11 @@ class Distribution(ABC):
         """
         Integrate the pdf function to return Cumulative Density value
         """
-        return quad(lambda x: self.pdf(x, *self.sol.x), -np.inf, x)[0]
+        mu = self.data.mean()
+        std = self.data.std()
+
+        output = quad(lambda x: self.pdf(x, *self.sol.x), mu-20*std, x)
+        return output[0]
 
     def quantile(self, alpha):
         return minimize_scalar(lambda x: (self.cdf(x)-alpha)**2).x
@@ -46,25 +47,26 @@ class Distribution(ABC):
         for idx, param in enumerate(self.parameters):
             print(f"{param}: {self.sol.x[idx]}")
 
-    def info_dict(self):
+    def info_dict(self) -> dict:
         info_dict = {'dist': self.name,
-                     'LL': self.sol.fun, 'AIC': self.aic(), 'AICC': self.aicc(), 'BIC': self.bic(),
+                     'LL': self.sol.fun, 'AIC': self.aic(),
+                     'AICC': self.aicc(), 'BIC': self.bic(),
                      'CAIC': self.caic(), 'HQC': self.hqc(),
                      'pydist': self
                      }
-        return info_dict
 
+        return info_dict
 
     def plot_dist(self):
         """
         Plot observed data and fit
         """
-        _, ax = plt.subplots(1,1)
-        
+        _, ax = plt.subplots(1, 1)
+
         mu = self.data.mean()
         std = self.data.std()
 
-        linspace = np.linspace(mu-4*std,mu+4*std, 101)
+        linspace = np.linspace(mu-4*std, mu+4*std, 101)
 
         ax.hist(self.data.values, bins=50, density=True)
         density = self.pdf(linspace, *self.sol.x)
@@ -76,7 +78,7 @@ class Distribution(ABC):
 
     def mle(self, x):
         self.sample_size = x.shape[0]
-        self.data = x 
+        self.data = x
 
     def __repr__(self) -> str:
         if self.sol is None:
