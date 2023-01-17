@@ -6,10 +6,10 @@ import scipy.stats as stats
 from scipy.special import hyp2f1, beta
 from abc import ABC, abstractmethod
 
-from scipy.special import beta, hyp2f1
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar
 
+import backtesting as bt
 
 class Distribution(ABC):
     def __init__(self) -> None:
@@ -57,11 +57,12 @@ class Distribution(ABC):
 
         return info_dict
 
-    def plot_dist(self):
+    def plot_dist(self, ax=None):
         """
         Plot observed data and fit
         """
-        _, ax = plt.subplots(1, 1)
+        if ax is None:
+            _, ax = plt.subplots(1, 1)
 
         mu = self.data.mean()
         std = self.data.std()
@@ -75,6 +76,30 @@ class Distribution(ABC):
         ax.set_title(f"{self}")
 
         return ax
+
+
+    def kupic_plot(self, quantiles, ax=None):
+
+        vars = [self.quantile(quantile) for quantile in quantiles]
+
+        p_vals = []
+
+        for alpha, var in zip(quantiles, vars):
+
+            viol_mask = (self.data > var)
+            likelihood_uc = bt.lr_uc(alpha, viol_mask)
+            p_val_uc = bt.p_chi2(likelihood_uc)
+            p_vals.append(p_val_uc)
+
+        if ax is None:
+            _, ax = plt.subplots(1, 1)
+
+
+        ax.plot(quantiles, p_vals, color='k')
+        ax.axhline(0.05, color='r')
+        
+        return ax
+
 
     def mle(self, x):
         self.sample_size = x.shape[0]
