@@ -11,23 +11,33 @@ from scipy.optimize import minimize_scalar
 
 import backtesting as bt
 
+from typing import Iterable
+
+
 class Distribution(ABC):
     def __init__(self) -> None:
 
         self.sol = None
-        self.name : str = None
-        self.num_parameters : int = None
-        self.parameters : str = None
-        self.sample_size : int = None
-        self.data : pd.DataFrame = None
+        self.name: str = None
+        self.num_parameters: int = None
+        self.parameters: str = None
+        self.sample_size: int = None
+        self.data: pd.DataFrame = None
         return
 
     @abstractmethod
-    def log_likelihood(x):
+    def log_likelihood(x: float, *dist_params: float) -> float:
+        """
+        Calculate log likelihood of observing x, given a distrubution 
+        with these parameters.
+        """
         pass
 
     @abstractmethod
-    def pdf():
+    def pdf(x: float) -> float:
+        """
+        Return value of probability density function evaluated at x.
+        """
         pass
 
     def cdf(self, x: float) -> float:
@@ -40,22 +50,45 @@ class Distribution(ABC):
         output = quad(lambda x: self.pdf(x, *self.sol.x), mu-20*std, x)
         return output[0]
 
-    def quantile(self, alpha):
+    def quantile(self, alpha: float) -> float:
+        """
+        Return inverse cdf for distrubution.
+        Inverse is found by root finding (cdf(x)-alpha)^2
+        """
         return minimize_scalar(lambda x: (self.cdf(x)-alpha)**2).x
-    
-    def expected_shortfall(self, alpha):
-        
+
+    def expected_shortfall(self, alpha: float) -> float:
+        """
+        Calculate expected shortfall by integrating xf(x)
+        +inf is replace with mu+20*std for efficiency
+        """
         mu = self.data.mean()
         std = self.data.std()
-        integral = quad(lambda x: x * self.pdf(x, *self.sol.x), self.quantile(alpha), mu+20*std)
-        
+        integral = quad(lambda x: x * self.pdf(x, *self.sol.x),
+                        self.quantile(alpha), mu+20*std)
+
         return integral[0]/(1-alpha)
 
     def print_params(self):
+        """
+        Print out distrubution parameter names and values
+        """
         for idx, param in enumerate(self.parameters):
             print(f"{param}: {self.sol.x[idx]}")
 
+        return
+
     def info_dict(self) -> dict:
+        """
+        Return information dict about the quality of distrubition fit.
+        Quality of fit is measured by the following metrics:
+        - AIC
+        - AICC
+        - BIC
+        - CAIC
+        - HQC
+        """
+
         info_dict = {'dist': self.name,
                      'LL': self.sol.fun, 'AIC': self.aic(),
                      'AICC': self.aicc(), 'BIC': self.bic(),
@@ -65,9 +98,9 @@ class Distribution(ABC):
 
         return info_dict
 
-    def plot_dist(self, ax=None):
+    def plot_dist(self, ax: plt.Axes = None) -> plt.Axes:
         """
-        Plot observed data and fit
+        Plot observed data and density of distrubutio fit
         """
         if ax is None:
             _, ax = plt.subplots(1, 1)
@@ -85,15 +118,17 @@ class Distribution(ABC):
 
         return ax
 
+    def kupic_plot(self, quantiles: Iterable[float], ax: plt.Axes = None) -> plt.Axes:
 
-    def kupic_plot(self, quantiles, ax=None):
-
+        # Calculate value at risk for each quantile
         vars = [self.quantile(quantile) for quantile in quantiles]
 
         p_vals = []
 
         for alpha, var in zip(quantiles, vars):
 
+            # get p value for each quantile based on
+            # observed and expected var exceedances
             viol_mask = (self.data > var)
             likelihood_uc = bt.lr_uc(alpha, viol_mask)
             p_val_uc = bt.p_chi2(likelihood_uc)
@@ -102,14 +137,16 @@ class Distribution(ABC):
         if ax is None:
             _, ax = plt.subplots(1, 1)
 
-
         ax.plot(quantiles, p_vals, color='k')
         ax.axhline(0.05, color='r')
-        
+
         return ax
 
-
+    @abstractmethod
     def mle(self, x):
+        """
+        Fit parameters of the distrubution using maximum likelihood estimation
+        """
         self.sample_size = x.shape[0]
         self.data = x
 
@@ -127,59 +164,62 @@ class Distribution(ABC):
 
         return repr_str
 
-    def aic(self):
-        '''
+    def aic(self) -> float:
+        """
         The AIC of an MLE estiamte equals 2*number of parameters - value of loglikelihood
         Inputs:
         k-number of parameters in distribution
         L-the value of the loglikelihood function
-        '''
+        """
         return 2*self.num_parameters + 2*self.sol.fun
 
-    def bic(self):
-        '''
+    def bic(self) -> float:
+        """
         The BIC of an MLE estiamte equals #parameters * log(sample size) - 2 * value of loglikelihood
         Inputs:
         k-number of parameters in distribution
         L-the value of the loglikelihood function
-        '''
+        """
         return self.num_parameters*np.log(self.sample_size) + 2*self.sol.fun
 
-    def caic(self):
-        '''
+    def caic(self) -> float:
+        """
         The BIC of an MLE estiamte equals #parameters * (log(sample size)+1) - 2 * value of loglikelihood
         Inputs:
         k-number of parameters in distribution
         L-the value of the loglikelihood function
-        '''
+        """
         return self.num_parameters*(np.log(self.sample_size)+1) + 2*self.sol.fun
 
-    def aicc(self):
-        '''
-        corrected Akaike information criterion
-        '''
+    def aicc(self) -> float:
+        """
+        Corrected Akaike information criterion
+        """
         k = self.num_parameters
         n = self.sample_size
 
         return self.aic() + 2*k*(k+1)/(n-k-1)
 
-    def hqc(self):
-        '''
+    def hqc(self) -> float:
+        """
         Hannan-Quinn criterion
-        '''
+        """
         k = self.num_parameters
         n = self.sample_size
 
         return 2*self.sol.fun + 2*k*np.log(np.log(n))
-    
-    def kol_smir(self):
-        '''
-        Kolmogorov-Smirnov test
-        '''
-        cdfdata=list(map(self.cdf,self.data))
-        return stats.kstest(self.data,cdfdata)
 
-    def kappa(self, nu):
+    def kol_smir(self) -> float:
+        """
+        Kolmogorov-Smirnov test
+        """
+        cdfdata = list(map(self.cdf, self.data))
+        return stats.kstest(self.data, cdfdata)
+
+    def kappa(self, nu: float) -> float:
+        """
+        Kappa function used in density of many child distrubutions
+        """
         return 1/(np.sqrt(nu)*beta(nu/2, 1/2))
 
 
@@ -206,12 +246,13 @@ class Laplace(Distribution):
         init_theta = [np.mean(x), 1]
 
         sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
-
         self.sol = sol
+        
         return sol.x
 
 
 class StudentT(Distribution):
+
     def __init__(self) -> None:
 
         super().__init__()
@@ -233,7 +274,6 @@ class StudentT(Distribution):
         init_theta = [np.mean(x), 0.05, 1]
 
         sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
-
         self.sol = sol
 
         return sol
@@ -265,19 +305,19 @@ class GeneralizedT(Distribution):
         init_theta = [np.mean(x), np.std(x, ddof=1), 1, 1]
 
         sol = minimize(objfun, init_theta, method='SLSQP', bounds=bnds)
-
         self.sol = sol
+
         return sol
 
 
 class NormalizedInverseGaussian(Distribution):
-    '''
+    """
     There is a normal inverse gaussian pdf function in scipy, which references the same source as the paper
     with  a = alpha * delta, b = beta * delta, loc = mu, scale=delta according to scipy documentation
 
     There is a requirement in scipy that |beta|<=alpha, this corresponds to |beta|<alpha, which isn't stated explicitly in the paper
     but is a requirement in order to ensure their paramter gamma=sqrt(alpha**2-beta**2) is real
-    '''
+    """
 
     def __init__(self) -> None:
 
@@ -309,8 +349,8 @@ class NormalizedInverseGaussian(Distribution):
 
         sol = minimize(objfun, init_theta, method='SLSQP',
                        bounds=bnds, constraints=con)
-
         self.sol = sol
+
         return sol
 
 
@@ -346,7 +386,6 @@ class GeneralizedHyperbolic(Distribution):
 
         sol = minimize(objfun, init_theta, method='Nelder-Mead',
                        bounds=bnds, constraints=con)
-
         self.sol = sol
 
         return sol
@@ -363,9 +402,11 @@ class SkewT(Distribution):
 
     @staticmethod
     def pdf(x, mu, sigma, nu, lmda):
-        return (2/sigma)*stats.t.pdf((x-mu)/sigma, df=nu) *\
-            stats.t.cdf((lmda*(x-mu)/sigma) * np.sqrt((nu+1) /
-                        (((x-mu)/sigma)**2 + nu)), df=nu+1)
+        output = (2/sigma)*stats.t.pdf((x-mu)/sigma, df=nu) *\
+            stats.t.cdf((lmda * (x-mu)/sigma) *
+                        np.sqrt((nu+1) / (((x-mu)/sigma)**2 + nu)), df=nu+1)
+
+        return output
 
     def log_likelihood(self, x, mu, sigma, nu, lmda):
         return np.sum(np.log(self.pdf(x, mu, sigma, nu, lmda)))
@@ -380,7 +421,6 @@ class SkewT(Distribution):
         init_theta = [np.mean(x), np.std(x, ddof=1), 1, 1]
 
         sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
-
         self.sol = sol
 
         return sol
@@ -397,7 +437,9 @@ class SkewedStudent(Distribution):
 
     def pdf(self, x, mu, sigma, nu, alpha):
         indicator = (x > mu)*1  # switch on if x is greater than mu
-        return (self.kappa(nu)/sigma) * (1+(1/nu)*((x-mu)/(2*sigma*(alpha*(1-indicator) + (1-alpha)*indicator)))**2)**(-(nu+1)/2)
+        output = (self.kappa(nu)/sigma) *\
+            (1+(1/nu)*((x-mu)/(2*sigma*(alpha*(1-indicator) + (1-alpha)*indicator)))**2)**(-(nu+1)/2)
+        return output
 
     def log_likelihood(self, x, mu, sigma, nu, alpha):
         return np.sum(np.log(self.pdf(x, mu, sigma, nu, alpha)))
@@ -412,8 +454,8 @@ class SkewedStudent(Distribution):
         init_theta = [np.mean(x), np.std(x, ddof=1), 1, 0.5]
 
         sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
-
         self.sol = sol
+
         return sol
 
 
@@ -434,8 +476,9 @@ class AsymmetricStudentT(Distribution):
 
         nu_indicator = nu1*(1-indicator) + nu2*indicator
 
-        return ((alpha/alpha2*(1-indicator) + (1-alpha)/(1-alpha2)*indicator) *
-                self.kappa(nu_indicator)/sigma*(1+1/nu_indicator*((x-mu)/(2*sigma*(alpha2*(1-indicator) + (1-alpha2)*indicator)))**2)**(-(nu_indicator+1)/2))
+        output = ((alpha/alpha2*(1-indicator) + (1-alpha)/(1-alpha2)*indicator) * self.kappa(nu_indicator)/sigma *
+                  (1+1/nu_indicator*((x-mu)/(2*sigma*(alpha2*(1-indicator) + (1-alpha2)*indicator)))**2)**(-(nu_indicator+1)/2))
+        return output
 
     def log_likelihood(self, x, mu, sigma, nu1, nu2, alpha):
         return np.sum(np.log(self.pdf(x, mu, sigma, nu1, nu2, alpha)))
