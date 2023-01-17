@@ -304,7 +304,7 @@ class GeneralizedT(Distribution):
 
         init_theta = [np.mean(x), np.std(x, ddof=1), 1, 1]
 
-        sol = minimize(objfun, init_theta, method='SLSQP', bounds=bnds)
+        sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
         self.sol = sol
 
         return sol
@@ -347,7 +347,7 @@ class NormalizedInverseGaussian(Distribution):
 
         init_theta = [np.mean(x), np.std(x, ddof=1), 1, 0.5]
 
-        sol = minimize(objfun, init_theta, method='SLSQP',
+        sol = minimize(objfun, init_theta, method='Nelder-Mead',
                        bounds=bnds, constraints=con)
         self.sol = sol
 
@@ -492,7 +492,7 @@ class AsymmetricStudentT(Distribution):
 
         init_theta = [np.mean(x), np.std(x, ddof=1), 1, 1, 0.5]
 
-        sol = minimize(objfun, init_theta, method='SLSQP', bounds=bnds)
+        sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
 
         self.sol = sol
         return sol

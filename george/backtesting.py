@@ -38,18 +38,3 @@ def p_chi2(x: float, dof: int = 1):
     """
     return 1-stats.chi2.cdf(x, dof)
 
-
-def main(data, alpha):
-
-        # remove start data where there is no var
-        non_na_data = data[~data[f'var_{str_alpha}'].isna()]
-
-        num_days = len(non_na_data)
-        # calculate p values for var
-        expected_viols = (1-alpha)*num_days
-
-        viol_mask = (non_na_data['loss']>non_na_data[f'var_{str_alpha}'])
-
-        likelihood_uc = lr_uc(alpha, viol_mask)
-
-        p_val_uc = p_chi2(likelihood_uc)
