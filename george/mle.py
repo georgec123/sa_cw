@@ -42,6 +42,14 @@ class Distribution(ABC):
 
     def quantile(self, alpha):
         return minimize_scalar(lambda x: (self.cdf(x)-alpha)**2).x
+    
+    def expected_shortfall(self, alpha):
+        
+        mu = self.data.mean()
+        std = self.data.std()
+        integral = quad(lambda x: x * self.pdf(x, *self.sol.x), self.quantile(alpha), mu+20*std)
+        
+        return integral[0]/(1-alpha)
 
     def print_params(self):
         for idx, param in enumerate(self.parameters):
