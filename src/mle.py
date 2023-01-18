@@ -1,17 +1,17 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+
 from scipy.optimize import minimize
 import scipy.stats as stats
 from scipy.special import hyp2f1, beta
-from abc import ABC, abstractmethod
-
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar
 
-import backtesting as bt
-
+from abc import ABC, abstractmethod
 from typing import Iterable
+
+import backtesting as bt
 
 
 class Distribution(ABC):
@@ -247,7 +247,7 @@ class Laplace(Distribution):
 
         sol = minimize(objfun, init_theta, method='Nelder-Mead', bounds=bnds)
         self.sol = sol
-        
+
         return sol.x
 
 
